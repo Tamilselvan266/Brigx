@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { GoogleSatelliteMap } from '../GoogleSatelliteMap';
 
 interface DashboardProps {
   mobile: string;
@@ -40,7 +41,7 @@ export function GovernmentDashboard({ mobile, onLogout }: DashboardProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
           <img
-                src="/src/assets/brigx.png"
+                src="/brigx.png" 
                 alt="BRIGX Logo"
                 className="h-27 w-auto-contain"
               />
@@ -176,35 +177,51 @@ export function GovernmentDashboard({ mobile, onLogout }: DashboardProps) {
           <TabsContent value="satellite" className="space-y-4">
             <h2 className="text-2xl font-bold text-gray-900">Satellite Imagery</h2>
             <div className="grid md:grid-cols-2 gap-4">
-              {projects.map((project, index) => (
-                <motion.div
-                  key={project.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                    <div className="h-64 bg-gradient-to-br from-green-800 via-green-700 to-green-900 rounded-t-lg relative overflow-hidden">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Satellite className="w-16 h-16 text-white opacity-30" />
+              {projects.map((project, index) => {
+                // Assign realistic coordinates per project
+                const coords = [
+                  { lat: 13.0827, lng: 80.2707 },  // Highway Bridge - Chennai
+                  { lat: 12.9716, lng: 77.5946 },  // Municipal Building - Bangalore
+                  { lat: 17.3850, lng: 78.4867 },  // Water Treatment - Hyderabad
+                ];
+                const { lat, lng } = coords[index] ?? { lat: 12.9716, lng: 77.5946 };
+                return (
+                  <motion.div
+                    key={project.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer overflow-hidden">
+                      <div className="relative">
+                        <Badge className="absolute top-3 right-3 z-10 bg-white text-gray-900">
+                          Satellite View
+                        </Badge>
+                        <GoogleSatelliteMap
+                          lat={lat}
+                          lng={lng}
+                          height="260px"
+                          siteName={project.name}
+                          zoom={17}
+                          className="rounded-t-lg rounded-b-none"
+                        />
                       </div>
-                      <Badge className="absolute top-3 right-3 bg-white text-gray-900">
-                        Satellite View
-                      </Badge>
-                    </div>
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold text-lg mb-2">{project.name}</h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                        <MapPin className="w-4 h-4" />
-                        {project.location}
-                      </div>
-                      <Button variant="outline" className="w-full" size="sm">
-                        View Before/After Comparison
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
+                      <CardContent className="p-4">
+                        <h3 className="font-semibold text-lg mb-2">{project.name}</h3>
+                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                          <MapPin className="w-4 h-4" />
+                          {project.location}
+                          <span className="text-gray-300">|</span>
+                          <span className="font-mono text-xs">{lat.toFixed(4)}, {lng.toFixed(4)}</span>
+                        </div>
+                        <Button variant="outline" className="w-full" size="sm">
+                          View Before/After Comparison
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                );
+              })}
             </div>
           </TabsContent>
 

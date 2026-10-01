@@ -61,12 +61,13 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
 
           {/* LOGO IMAGE */}
           <motion.img
-            src="/src/assets/brigx.png"
+            src="/brigx.png"
             alt="BRIGX Logo"
             className="w-60 h-auto relative z-10"
             initial={{ rotateY: 90 }}
             animate={{ rotateY: 0, y: [0, -10, 0] }}
             transition={{
+              
               rotateY: { duration: 1, delay: 0.6, ease: 'easeOut' },
               y: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
             }}

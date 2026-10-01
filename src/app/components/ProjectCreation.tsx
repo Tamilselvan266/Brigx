@@ -1,16 +1,170 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { MapPin, Search, Plus, ArrowRight, X } from 'lucide-react';
+import { MapPin, ArrowRight, X, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { toast } from 'sonner';
+
+// ── Inline satellite picker (click-to-pin using Google Maps) ─────────────────
+type PinState = 'loading' | 'ready' | 'error';
+
+let _mapsLoaded: PinState = 'idle' as unknown as PinState;
+let _mapsCallbacks: Array<(ok: boolean) => void> = [];
+
+function ensureMapsLoaded(cb: (ok: boolean) => void) {
+  const state = _mapsLoaded as unknown as string;
+  if (state === 'ready') { cb(true); return; }
+  if (state === 'error') { cb(false); return; }
+  _mapsCallbacks.push(cb);
+  if (state === 'loading') return;
+  (_mapsLoaded as unknown as string) = 'loading';
+  // Re-use already loaded script if present
+  if (window.google?.maps) {
+    (_mapsLoaded as unknown as string) = 'ready';
+    _mapsCallbacks.forEach(c => c(true));
+    _mapsCallbacks = [];
+    return;
+  }
+  const existing = document.getElementById('google-maps-script');
+  if (existing) {
+    // script already injected by GoogleSatelliteMap — wait for it
+    const poll = setInterval(() => {
+      if (window.google?.maps) {
+        clearInterval(poll);
+        (_mapsLoaded as unknown as string) = 'ready';
+        _mapsCallbacks.forEach(c => c(true));
+        _mapsCallbacks = [];
+      }
+    }, 200);
+    return;
+  }
+  const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
+  if (!key) {
+    (_mapsLoaded as unknown as string) = 'error';
+    _mapsCallbacks.forEach(c => c(false));
+    _mapsCallbacks = [];
+    return;
+  }
+  const s = document.createElement('script');
+  s.id = 'google-maps-script';
+  s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=geometry`;
+  s.async = true; s.defer = true;
+  s.onload = () => { (_mapsLoaded as unknown as string) = 'ready'; _mapsCallbacks.forEach(c => c(true)); _mapsCallbacks = []; };
+  s.onerror = () => { (_mapsLoaded as unknown as string) = 'error'; _mapsCallbacks.forEach(c => c(false)); _mapsCallbacks = []; };
+  document.head.appendChild(s);
+}
+
+interface SatellitePickerProps {
+  onPinned: (lat: number, lng: number) => void;
+  pinned: { lat: number; lng: number } | null;
+}
+
+function SatellitePicker({ onPinned, pinned }: SatellitePickerProps) {
+  const divRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.Marker | null>(null);
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+
+  useEffect(() => {
+    ensureMapsLoaded((ok) => {
+      if (!ok) { setState('error'); return; }
+      if (!divRef.current || !window.google?.maps) { setState('error'); return; }
+      // Default centre: India
+      const defaultCenter = { lat: 20.5937, lng: 78.9629 };
+      const map = new google.maps.Map(divRef.current, {
+        center: defaultCenter,
+        zoom: 5,
+        mapTypeId: 'satellite',
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: true,
+        zoomControl: true,
+      });
+      mapRef.current = map;
+
+      // If already pinned, show that marker
+      if (pinned) {
+        map.setCenter(pinned);
+        map.setZoom(18);
+        markerRef.current = new google.maps.Marker({
+          position: pinned,
+          map,
+          title: 'Construction Site',
+          animation: google.maps.Animation.DROP,
+          icon: {
+            path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+            scale: 7,
+            fillColor: '#EA580C',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+          },
+        });
+      }
+
+      map.addListener('click', (e: google.maps.MapMouseEvent) => {
+        if (!e.latLng) return;
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+        // Move or create marker
+        if (markerRef.current) {
+          markerRef.current.setPosition({ lat, lng });
+        } else {
+          markerRef.current = new google.maps.Marker({
+            position: { lat, lng },
+            map,
+            title: 'Construction Site',
+            animation: google.maps.Animation.DROP,
+            icon: {
+              path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+              scale: 7,
+              fillColor: '#EA580C',
+              fillOpacity: 1,
+              strokeColor: '#ffffff',
+              strokeWeight: 2,
+            },
+          });
+        }
+        onPinned(lat, lng);
+      });
+
+      setState('ready');
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="relative rounded-xl overflow-hidden border-2 border-gray-200" style={{ height: '400px' }}>
+      {state === 'loading' && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-gray-100">
+          <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+          <p className="text-sm text-gray-500">Loading map…</p>
+        </div>
+      )}
+      {state === 'error' && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-gray-100">
+          <MapPin className="w-8 h-8 text-orange-500" />
+          <p className="text-sm font-semibold text-gray-700">Map unavailable</p>
+          <p className="text-xs text-gray-400">Check your API key in .env</p>
+        </div>
+      )}
+      <div ref={divRef} style={{ height: '100%', width: '100%' }} />
+      {state === 'ready' && !pinned && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg text-sm font-medium text-gray-700 pointer-events-none">
+          📍 Click on the satellite map to pin your construction site
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface ProjectCreationProps {
   onClose: () => void;
   onProjectCreated: (project: any) => void;
 }
+
 
 export function ProjectCreation({ onClose, onProjectCreated }: ProjectCreationProps) {
   const [step, setStep] = useState<'details' | 'map'>('details');
@@ -19,15 +173,7 @@ export function ProjectCreation({ onClose, onProjectCreated }: ProjectCreationPr
   const [location, setLocation] = useState('');
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
 
-  const handleMapSelect = () => {
-    // Simulate map location selection
-    const mockCoordinates = {
-      lat: 12.9716 + (Math.random() - 0.5) * 0.1,
-      lng: 77.5946 + (Math.random() - 0.5) * 0.1,
-    };
-    setCoordinates(mockCoordinates);
-    toast.success('Location pinned successfully!');
-  };
+  // No mock map select needed – real map handles click-to-pin
 
   const handleCreateProject = () => {
     if (!projectName || !projectType || !coordinates) {
@@ -132,76 +278,14 @@ export function ProjectCreation({ onClose, onProjectCreated }: ProjectCreationPr
                 </p>
               </div>
 
-              {/* Mock Map */}
-              <div className="relative h-96 bg-gradient-to-br from-green-100 via-blue-50 to-green-100 rounded-xl border-2 border-gray-200 overflow-hidden">
-                {/* Map grid overlay */}
-                <div className="absolute inset-0 opacity-20">
-                  <div className="grid grid-cols-8 grid-rows-8 h-full">
-                    {Array.from({ length: 64 }).map((_, i) => (
-                      <div key={i} className="border border-gray-400" />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Roads simulation */}
-                <div className="absolute top-1/3 left-0 right-0 h-8 bg-gray-400 opacity-30" />
-                <div className="absolute top-0 bottom-0 left-1/2 w-8 bg-gray-400 opacity-30" />
-
-                {/* Map controls */}
-                <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-2">
-                  <div className="relative">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input
-                      placeholder="Search location..."
-                      className="pl-8 w-64"
-                    />
-                  </div>
-                </div>
-
-                {/* Zoom controls */}
-                <div className="absolute right-4 top-4 bg-white rounded-lg shadow-lg p-1 flex flex-col gap-1">
-                  <Button variant="ghost" size="icon" className="w-8 h-8">
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                  <div className="h-px bg-gray-200" />
-                  <Button variant="ghost" size="icon" className="w-8 h-8">
-                    <span className="text-lg font-bold">−</span>
-                  </Button>
-                </div>
-
-                {/* Pin location button */}
-                {!coordinates && (
-                  <motion.button
-                    onClick={handleMapSelect}
-                    className="absolute inset-0 flex items-center justify-center cursor-crosshair group"
-                    whileHover={{ scale: 1.02 }}
-                  >
-                    <div className="bg-white/90 backdrop-blur rounded-2xl p-6 shadow-xl group-hover:shadow-2xl transition-shadow">
-                      <MapPin className="w-12 h-12 text-orange-600 mx-auto mb-2" />
-                      <p className="text-sm font-medium text-gray-900">Click to pin location</p>
-                    </div>
-                  </motion.button>
-                )}
-
-                {/* Pinned location */}
-                {coordinates && (
-                  <motion.div
-                    initial={{ scale: 0, y: -50 }}
-                    animate={{ scale: 1, y: 0 }}
-                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full"
-                  >
-                    <motion.div
-                      animate={{ y: [0, -10, 0] }}
-                      transition={{ repeat: Infinity, duration: 2 }}
-                    >
-                      <MapPin className="w-12 h-12 text-orange-600 fill-orange-600 drop-shadow-lg" />
-                    </motion.div>
-                    <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-white px-3 py-1 rounded-lg shadow-lg text-xs font-medium">
-                      {coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)}
-                    </div>
-                  </motion.div>
-                )}
-              </div>
+              {/* Real Google Maps Satellite — click to pin construction site */}
+              <SatellitePicker
+                pinned={coordinates}
+                onPinned={(lat, lng) => {
+                  setCoordinates({ lat, lng });
+                  toast.success('Location pinned successfully!');
+                }}
+              />
 
               {coordinates && (
                 <Card className="border-green-200 bg-green-50">

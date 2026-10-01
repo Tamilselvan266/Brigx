@@ -15,6 +15,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { GoogleSatelliteMap } from './GoogleSatelliteMap';
 
 interface Project {
   id: number;
@@ -166,9 +167,7 @@ export function ProjectMonitoring({ project, onClose }: ProjectMonitoringProps) 
                   </motion.div>
                 ))}
               </div>
-            </TabsContent>
-
-            {/* Satellite Tab */}
+            </TabsContent>            {/* Satellite Tab */}
             <TabsContent value="satellite" className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-900">Satellite Imagery Timeline</h3>
@@ -182,100 +181,139 @@ export function ProjectMonitoring({ project, onClose }: ProjectMonitoringProps) 
                 </Button>
               </div>
 
-              {!compareMode ? (
-                <div className="grid md:grid-cols-2 gap-4">
-                  {satelliteImages.map((image, index) => (
-                    <motion.div
-                      key={image.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
-                        <div className="relative h-64 bg-gradient-to-br from-green-800 via-green-700 to-green-900 rounded-t-lg overflow-hidden">
-                          {/* Satellite view simulation */}
-                          <div className="absolute inset-0 opacity-30">
-                            <div className="absolute top-0 left-0 w-32 h-32 bg-green-600 rounded-full blur-3xl" />
-                            <div className="absolute bottom-0 right-0 w-40 h-40 bg-green-500 rounded-full blur-3xl" />
+              {/* Resolve coordinates: use project coords if available, else Bangalore default */}
+              {(() => {
+                const lat = project.coordinates?.lat ?? 12.9716;
+                const lng = project.coordinates?.lng ?? 77.5946;
+                return !compareMode ? (
+                  <>
+                    {/* Live satellite view of the construction site */}
+                    <Card className="overflow-hidden">
+                      <div className="relative">
+                        <Badge className="absolute top-3 right-3 z-10 bg-orange-600 text-white">
+                          Live Satellite View
+                        </Badge>
+                        <GoogleSatelliteMap
+                          lat={lat}
+                          lng={lng}
+                          height="420px"
+                          siteName={project.name}
+                          zoom={18}
+                          className="rounded-none"
+                        />
+                      </div>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <MapPin className="w-4 h-4 text-orange-600" />
+                            <span>{project.location}</span>
+                            <span className="text-gray-400">•</span>
+                            <span className="font-mono text-xs">{lat.toFixed(6)}, {lng.toFixed(6)}</span>
                           </div>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Satellite className="w-16 h-16 text-white opacity-40" />
-                          </div>
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                            <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                          <Badge className="absolute top-3 right-3 bg-white text-gray-900">
-                            {image.label}
-                          </Badge>
+                          <Button variant="outline" size="sm">
+                            <Download className="w-4 h-4 mr-1" />
+                            Export
+                          </Button>
                         </div>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm text-gray-600">
-                              <Calendar className="w-4 h-4 inline mr-1" />
-                              {image.date.toLocaleDateString()}
-                            </div>
-                            <Button variant="outline" size="sm">
-                              <Download className="w-4 h-4 mr-1" />
-                              Download
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Before & After Comparison</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                      </CardContent>
+                    </Card>
+
+                    {/* Historical timeline entries */}
                     <div className="grid md:grid-cols-2 gap-4">
-                      {/* Before */}
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">Before (1 month ago)</p>
-                        <div className="relative h-80 bg-gradient-to-br from-green-800 via-green-700 to-green-900 rounded-lg overflow-hidden">
-                          <div className="absolute inset-0 opacity-20">
-                            <div className="absolute top-0 left-0 w-32 h-32 bg-green-600 rounded-full blur-3xl" />
+                      {satelliteImages.map((image, index) => (
+                        <motion.div
+                          key={image.id}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                            <div className="relative">
+                              <Badge className="absolute top-3 right-3 z-10 bg-white text-gray-900">
+                                {image.label}
+                              </Badge>
+                              <GoogleSatelliteMap
+                                lat={lat}
+                                lng={lng}
+                                height="200px"
+                                siteName={project.name}
+                                zoom={18}
+                                className="rounded-t-lg rounded-b-none"
+                              />
+                            </div>
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm text-gray-600">
+                                  <Calendar className="w-4 h-4 inline mr-1" />
+                                  {image.date.toLocaleDateString()}
+                                </div>
+                                <Button variant="outline" size="sm">
+                                  <Download className="w-4 h-4 mr-1" />
+                                  Download
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Before &amp; After Comparison</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        {/* Before */}
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-2">Before (1 month ago)</p>
+                          <div className="relative rounded-lg overflow-hidden">
+                            <Badge className="absolute top-3 left-3 z-10 bg-white text-gray-900">
+                              Initial State
+                            </Badge>
+                            <GoogleSatelliteMap
+                              lat={lat}
+                              lng={lng}
+                              height="320px"
+                              siteName={`${project.name} - Before`}
+                              zoom={17}
+                              className="rounded-lg"
+                            />
                           </div>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Satellite className="w-20 h-20 text-white opacity-30" />
+                        </div>
+
+                        {/* After */}
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-2">After (Current)</p>
+                          <div className="relative rounded-lg overflow-hidden">
+                            <Badge className="absolute top-3 left-3 z-10 bg-orange-600">
+                              Current State
+                            </Badge>
+                            <GoogleSatelliteMap
+                              lat={lat}
+                              lng={lng}
+                              height="320px"
+                              siteName={`${project.name} - Current`}
+                              zoom={18}
+                              className="rounded-lg"
+                            />
                           </div>
-                          <Badge className="absolute top-3 left-3 bg-white text-gray-900">
-                            Initial State
-                          </Badge>
                         </div>
                       </div>
 
-                      {/* After */}
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">After (Current)</p>
-                        <div className="relative h-80 bg-gradient-to-br from-green-700 via-green-600 to-blue-800 rounded-lg overflow-hidden">
-                          <div className="absolute inset-0 opacity-30">
-                            <div className="absolute top-1/3 left-1/3 w-24 h-24 bg-orange-500 rounded" />
-                            <div className="absolute top-1/2 left-1/2 w-16 h-16 bg-gray-700 rounded" />
-                          </div>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Satellite className="w-20 h-20 text-white opacity-30" />
-                          </div>
-                          <Badge className="absolute top-3 left-3 bg-orange-600">
-                            Current State
-                          </Badge>
-                        </div>
+                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <h4 className="font-semibold text-blue-900 mb-2">Changes Detected</h4>
+                        <ul className="text-sm text-blue-800 space-y-1">
+                          <li>• Foundation work completed (approx. 800 sq ft)</li>
+                          <li>• Ground floor structure visible</li>
+                          <li>• Construction materials stockpiled on site</li>
+                        </ul>
                       </div>
-                    </div>
-
-                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <h4 className="font-semibold text-blue-900 mb-2">Changes Detected</h4>
-                      <ul className="text-sm text-blue-800 space-y-1">
-                        <li>• Foundation work completed (approx. 800 sq ft)</li>
-                        <li>• Ground floor structure visible</li>
-                        <li>• Construction materials stockpiled on site</li>
-                      </ul>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                    </CardContent>
+                  </Card>
+                );
+              })()}
             </TabsContent>
           </Tabs>
         </div>
