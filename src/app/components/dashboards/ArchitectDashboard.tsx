@@ -24,7 +24,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { ProjectCreation } from '../ProjectCreation';
 import { toast } from 'sonner';
-import { ChatSystem } from '../Chatsystem';
+import { ChatSystem } from '../ChatSystem';
 
 interface DashboardProps {
   mobile: string;

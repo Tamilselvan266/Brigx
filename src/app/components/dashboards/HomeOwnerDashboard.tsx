@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { ChatSystem } from '../Chatsystem';
+import { ChatSystem } from '../ChatSystem';
 import {
   Home,
   Plus,
