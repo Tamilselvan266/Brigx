@@ -11,7 +11,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { Button } from '../ui/button';
-import { ChatSystem } from '../Chatsystem';
+import { ChatSystem } from '../ChatSystem';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
